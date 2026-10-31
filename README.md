@@ -4,8 +4,6 @@
 
 让 AI 为图片添加中文说明、箭头、编号、框选、高亮和模糊。支持本地图片、Cherry Studio 聊天附件，以及可嵌入回复正文的本机图片 URL。
 
-![原有标注示例](examples/annotated.png)
-
 ## 安装与配置
 
 需要 **Node.js 18+**。

@@ -4,8 +4,6 @@
 
 Let AI add arrows, numbers, labels, highlights, callouts, and blur to images. Supports local files, Cherry Studio chat images, and local image URLs for Markdown replies.
 
-![Original annotation example](examples/annotated.png)
-
 ## Quick start
 
 Requires **Node.js 18+**.
