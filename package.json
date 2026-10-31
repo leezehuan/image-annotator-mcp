@@ -30,12 +30,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vapvarun/image-annotator-mcp.git"
+    "url": "git+https://github.com/leezehuan/image-annotator-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/vapvarun/image-annotator-mcp/issues"
+    "url": "https://github.com/leezehuan/image-annotator-mcp/issues"
   },
-  "homepage": "https://github.com/vapvarun/image-annotator-mcp#readme",
+  "homepage": "https://github.com/leezehuan/image-annotator-mcp#readme",
   "engines": {
     "node": ">=18.0.0"
   },
