@@ -46,7 +46,14 @@ async function main() {
       assert.deepEqual(bytes, await fs.readFile(outputPath));
       assert.equal((await sharp(bytes).metadata()).format, expectedFormat);
       assert.ok(result.content[0].text.includes(outputPath), 'saved path remains available');
-      process.stdout.write(`PASS ${example.name} returns renderable ${expectedFormat} image data\n`);
+      const url = result.content[0].text.match(/Image URL: (http:\/\/127\.0\.0\.1:\d+\/images\/[^\s]+)/)?.[1];
+      assert.ok(url, `${example.name} must return a local image URL`);
+      assert.ok(result.content[0].text.includes(`![Annotated image](${url})`), 'result includes Markdown to embed unchanged');
+      const response = await fetch(url);
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('content-type'), image.mimeType);
+      assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
+      process.stdout.write(`PASS ${example.name} returns ${expectedFormat} image data and a working HTTP image URL\n`);
     }
   } finally {
     await client.close();

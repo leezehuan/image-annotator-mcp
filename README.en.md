@@ -24,6 +24,14 @@ Professional MCP server for annotating screenshots with markers, arrows, callout
 
 ---
 
+## What's new in 1.5.0 (local image URLs)
+
+- Generated images include a loopback HTTP URL and ready-to-copy Markdown for the final reply.
+- A local-only server starts lazily on an available port and serves registered image snapshots. URLs expire after 24 hours or when the MCP connection closes.
+- Original files and MCP image content remain available. Cherry Studio 2.1.8 inline HTTP rendering still requires UI verification.
+
+---
+
 ## What's new in 1.4.2 (text layout and image results)
 
 - **Measured text boxes** — label backgrounds and automatically sized callouts use rendered glyph bounds for Chinese, Latin, and mixed text, while preserving label baselines.
@@ -140,7 +148,11 @@ If multiple configured caches exist, set an explicit override in the MCP configu
 
 ## MCP Tools
 
-Image-generating tools (`annotate_screenshot`, `create_step_guide`, `highlight_area`, `add_callout`, `blur_area`, and `frame_screenshot`) return both a text block with the saved path and an MCP `image` block containing the generated image. In Cherry Studio 2.1.8, expand the completed tool card to see the image in its response. The final assistant text does not automatically embed tool images, and a Markdown image pointing to `D:/...` is not a supported way to display a local file there.
+Image-generating tools (`annotate_screenshot`, `create_step_guide`, `highlight_area`, `add_callout`, `blur_area`, and `frame_screenshot`) return the saved path, MCP image content, a local HTTP image URL, and ready-to-copy Markdown. Copy the returned Markdown unchanged into the final reply, outside a code block. Use the actual URL returned by the tool, not a disk path.
+
+The server starts on demand, binds only to `127.0.0.1` on an available port, and serves independent image snapshots from `.image-annotator-tmp/`. It never exposes arbitrary files or directory listings. URLs last up to 24 hours and stop working when the MCP process or connection closes; restarting the server does not restore old URLs. The client must run on the same computer. Files stay local and no extra dependencies are needed.
+
+HTTP bytes, MIME types, concurrency, snapshot stability, expiration, and shutdown are covered by integration tests. **Cherry Studio 2.1.8 inline HTTP rendering has not yet been UI-verified.** If the client blocks the URL or the local listener cannot start, expand the tool response to see its MCP image. Markdown images pointing to `D:/...` or `file:///...` remain unsupported there.
 
 ### `list_cherry_images`
 
@@ -387,6 +399,11 @@ node annotate.js --help
 ---
 
 ## Changelog
+
+### 1.5.0
+- Return loopback HTTP image URLs and final-reply Markdown from all six generating tools
+- Serve registered snapshots through local-only GET/HEAD routes with a 24-hour lifetime
+- Close the listener with the MCP connection and retain saved paths and MCP image content
 
 ### 1.4.2
 - Measure rendered text to size label backgrounds and callout boxes for Chinese and mixed text

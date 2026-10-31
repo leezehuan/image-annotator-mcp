@@ -30,6 +30,7 @@ const {
   saveImageBuffer
 } = require('./attachment.js');
 const { listCherryImages, readCherryImage } = require('./cherry-cache.js');
+const { ImageServer } = require('./image-server.js');
 
 // Tool definitions
 const tools = [
@@ -82,8 +83,10 @@ add_callout, blur_area, or frame_screenshot. Temporary files are eligible for cl
   {
     name: 'annotate_screenshot',
     description: `Add professional annotations to a screenshot image.
-Returns the saved image as MCP image content plus its file path. In Cherry Studio, the user can
-expand this tool's response to view the image; a local-path Markdown image is not a display URL.
+Returns MCP image content, its saved path, and a local HTTP image URL. Copy the returned
+Markdown image into your final reply unchanged to show the result inline. The URL works while
+this MCP server is running on the same computer as the client (up to 24 hours).
+The tool response also includes the image if the client cannot display the URL.
 
 Annotation types available:
 • marker - Numbered circles (1, 2, 3...) with gradient and shadow
@@ -362,6 +365,7 @@ Use on a raw or already-annotated screenshot. Supports webp/jpeg output and down
 
 // Create a server without starting stdio, so the same MCP interface can be tested in-process.
 function createServer() {
+  const images = new ImageServer();
   const server = new Server(
     {
       name: 'image-annotator',
@@ -373,6 +377,12 @@ function createServer() {
       },
     }
   );
+  server.onclose = () => { void images.close(); };
+  const closeProtocol = server.close.bind(server);
+  server.close = async () => {
+    await images.close();
+    await closeProtocol();
+  };
 
   // List tools handler
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
@@ -388,19 +398,19 @@ function createServer() {
         case 'save_attached_image':
           return await handleSaveAttachedImage(args);
         case 'annotate_screenshot':
-          return await handleAnnotate(args);
+          return await includeImageUrl(await handleAnnotate(args), images);
         case 'get_image_dimensions':
           return await handleDimensions(args);
         case 'create_step_guide':
-          return await handleStepGuide(args);
+          return await includeImageUrl(await handleStepGuide(args), images);
         case 'highlight_area':
-          return await handleHighlight(args);
+          return await includeImageUrl(await handleHighlight(args), images);
         case 'add_callout':
-          return await handleCallout(args);
+          return await includeImageUrl(await handleCallout(args), images);
         case 'blur_area':
-          return await handleBlur(args);
+          return await includeImageUrl(await handleBlur(args), images);
         case 'frame_screenshot':
-          return await handleFrame(args);
+          return await includeImageUrl(await handleFrame(args), images);
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
@@ -429,10 +439,24 @@ async function imageResult(outputPath, message) {
   const mimeType = metadata.format === 'jpeg' ? 'image/jpeg' : `image/${metadata.format}`;
   return {
     content: [
-      { type: 'text', text: `${message}\n  Image included in this tool response. In Cherry Studio, expand the tool result to view it.` },
+      { type: 'text', text: `${message}\n  Image included in this tool response.` },
       { type: 'image', data: buffer.toString('base64'), mimeType }
     ]
   };
+}
+
+async function includeImageUrl(result, images) {
+  const image = result.content.find((part) => part.type === 'image');
+  if (!image) return result;
+  let guidance;
+  try {
+    const url = await images.publish(Buffer.from(image.data, 'base64'), image.mimeType);
+    guidance = `Image URL: ${url}\nCopy this Markdown into your final reply unchanged (outside a code block):\n![Annotated image](${url})\nThis local URL expires after 24 hours or when this MCP server stops. If inline display fails, expand the tool response to view the image.`;
+  } catch (error) {
+    guidance = `Local image URL unavailable: ${error.message}. The saved file and MCP image are available; expand the tool response to view the image.`;
+  }
+  result.content[0].text += `\n${guidance}`;
+  return result;
 }
 
 // Handlers
@@ -721,6 +745,7 @@ async function main() {
   const server = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  process.stdin.once('end', () => { void server.close(); });
   console.error(`Image Annotator MCP Server v${version} running...`);
 }
 

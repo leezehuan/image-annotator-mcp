@@ -1,8 +1,8 @@
 # Usage Guide — Image Annotator MCP
 
-A task-oriented cookbook. For the full parameter reference, see [README.md](README.md).
+A task-oriented cookbook. For the full parameter reference, see [README.en.md](README.en.md).
 
-Every recipe is a JSON payload you pass to a tool (`annotate_screenshot` unless noted). All coordinates are in **image pixels** — read [the coordinate model](README.md#coordinate-model-read-this-first) first.
+Every recipe is a JSON payload you pass to a tool (`annotate_screenshot` unless noted). All coordinates are in **image pixels** — read [the coordinate model](README.en.md#coordinate-model-read-this-first) first.
 
 ## Save an image attached in the conversation
 
@@ -14,7 +14,7 @@ For Cherry Studio, first call `list_cherry_images` with `{}`. Match the image pr
 }
 ```
 
-The cache spans multiple chats, so identify the image visually instead of assuming the newest file is the current attachment. Use the returned `next_offset` to find older images. Annotation coordinates use the original dimensions, not the resized preview dimensions. See [Cherry Studio configuration](README.md#cherry-studio-stdio) if the cache is missing or stored on another drive.
+The cache spans multiple chats, so identify the image visually instead of assuming the newest file is the current attachment. Use the returned `next_offset` to find older images. Annotation coordinates use the original dimensions, not the resized preview dimensions. See [Cherry Studio configuration](README.en.md#cherry-studio-stdio) if the cache is missing or stored on another drive.
 
 When the client already supplies image data, pass Base64 or a data URL instead:
 
@@ -72,7 +72,7 @@ Before annotating, get the real pixel size:
 // → { "width": 3450, "height": 1760, "format": "png" }
 ```
 
-If you captured with Playwright, measure the element's center and multiply by the device pixel ratio (usually 2 on retina). See the [Playwright workflow](README.md#workflow-with-playwright-mcp).
+If you captured with Playwright, measure the element's center and multiply by the device pixel ratio (usually 2 on retina). See the [Playwright workflow](README.en.md#workflow-with-playwright-mcp).
 
 Rule of thumb: **point `target` at the element's center**, and let markers/spotlights offset themselves.
 
@@ -259,7 +259,7 @@ When you don't need a full composition:
 
 ## 10. Troubleshooting
 
-**The annotated image is saved but not visible in Cherry's final reply.** A Markdown image such as `![](D:/.../result.png)` cannot load a local disk path in Cherry's final reply. Starting with 1.4.1, image-generating tools return actual MCP image content as well as the path. Restart the MCP server, run the annotation again, and expand the tool card to see its response image. Old text-only tool results are not updated automatically. Tool-result previews do not automatically insert an image into the assistant's final message.
+**The annotated image is saved but not visible in Cherry's final reply.** Starting with 1.5.0, generating tools return a local HTTP image URL and ready-to-copy Markdown. Restart the MCP server, regenerate the image, and have the model copy that Markdown unchanged into its final reply outside a code block. The URL works on the same computer for up to 24 hours while this MCP server is running; it expires on shutdown or restart. Use the actual returned URL, not a disk path such as `D:/...` or `file:///...`. Cherry Studio 2.1.8 inline HTTP rendering still requires UI verification. The tool response also contains the actual MCP image as a fallback; expand it if the URL cannot be displayed.
 
 **Cherry still asks for a path or re-upload.** Restart the MCP server so `list_cherry_images` is loaded, then ask the model to use that tool before `save_attached_image`. Version 1.3.0 only accepted Base64; the cache integration requires 1.4.0. The MCP command must run this local `server.js`, rather than an older published package. A model that can process image previews is needed to match a candidate to the attachment.
 
