@@ -16,14 +16,14 @@ cd image-annotator-mcp
 npm ci
 ```
 
-在 Cherry Studio 或其他 MCP 客户端添加 **stdio** 服务，将参数替换为本机 `server.js` 的绝对路径：
+在 Cherry Studio 或其他 MCP 客户端添加 **stdio** 服务，将下方示例路径替换为本机 `server.js` 的绝对路径：
 
 ```json
 {
   "mcpServers": {
     "image-annotator": {
       "command": "node",
-      "args": ["D:\\Project\\image-annotator-mcp\\server.js"]
+      "args": ["C:\\path\\to\\image-annotator-mcp\\server.js"]
     }
   }
 }

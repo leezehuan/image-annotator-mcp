@@ -43,7 +43,7 @@ npm ci
 | 名称 | `image-annotator` |
 | 类型 | `stdio` |
 | 命令 | `node`，或本机 `node.exe` 的绝对路径 |
-| 参数 | `server.js` 的绝对路径，例如 `D:\Project\image-annotator-mcp\server.js` |
+| 参数 | `server.js` 的绝对路径，例如 `C:\path\to\image-annotator-mcp\server.js`（请替换为实际路径） |
 
 支持导入 MCP JSON 配置的客户端可使用下列内容，替换成自己的安装路径：
 
@@ -52,7 +52,7 @@ npm ci
   "mcpServers": {
     "image-annotator": {
       "command": "node",
-      "args": ["D:\\Project\\image-annotator-mcp\\server.js"]
+      "args": ["C:\\path\\to\\image-annotator-mcp\\server.js"]
     }
   }
 }
@@ -137,7 +137,7 @@ Cherry Studio 2.1.8 不会自动把当前对话附件的文件路径或 Base64 �
   "mcpServers": {
     "image-annotator": {
       "command": "node",
-      "args": ["D:\\Project\\image-annotator-mcp\\server.js"],
+      "args": ["C:\\path\\to\\image-annotator-mcp\\server.js"],
       "env": {
         "CHERRY_STUDIO_FILES_DIR": "D:\\CherryData\\Data\\Files"
       }

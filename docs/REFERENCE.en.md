@@ -118,7 +118,7 @@ Point Cherry's MCP configuration at this local checkout:
   "mcpServers": {
     "image-annotator": {
       "command": "node",
-      "args": ["D:\\Project\\image-annotator-mcp\\server.js"]
+      "args": ["C:\\path\\to\\image-annotator-mcp\\server.js"]
     }
   }
 }
