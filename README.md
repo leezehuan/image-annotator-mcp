@@ -1,4 +1,4 @@
-# Image Annotator MCP
+# Image Annotator MCP · 图片标注助手
 
 中文 | [English](README.en.md) · **v1.5.0**
 
