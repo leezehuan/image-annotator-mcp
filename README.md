@@ -17,7 +17,22 @@ Professional MCP server for annotating screenshots with markers, arrows, callout
 - **Screenshot framing** — rounded browser chrome + drop shadow + matte padding
 - **Output control** — PNG / WebP / JPEG, quality, and downscale for crisp, light web images
 - **Theme support** — pre-built themes for documentation, tutorials, bug reports, and highlights
-- **7 MCP tools** — from one-liners (`highlight_area`, `add_callout`) to full compositions (`annotate_screenshot`)
+- **9 MCP tools** — including Cherry Studio image discovery and temporary saving of conversation images
+
+---
+
+## What's new in 1.4.0 (Cherry Studio images)
+
+- **`list_cherry_images`** — find cached Cherry Studio images with IDs, original dimensions, and previews, without asking the model to supply Base64.
+- **Import by ID** — pass a selected `cherry_image_id` to `save_attached_image` to copy the original into the project temporary directory.
+- **Custom data directories** — respect Cherry's boot configuration and an optional `CHERRY_STUDIO_FILES_DIR` override.
+
+---
+
+## What's new in 1.3.0 (conversation attachments)
+
+- **`save_attached_image`** — save a Base64 image attachment to the project temporary directory and use its returned path with the existing tools.
+- **Temporary-file limits** — accept supported image formats up to 20 MB and remove files older than 24 hours when the server starts.
 
 ---
 
@@ -75,6 +90,33 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 > After updating the server, **restart Claude Code / Claude Desktop** so the new tool schema is loaded.
 
+### Cherry Studio (stdio)
+
+Point Cherry's MCP configuration at this local checkout:
+
+```json
+{
+  "mcpServers": {
+    "image-annotator": {
+      "command": "node",
+      "args": ["D:\\Project\\image-annotator-mcp\\server.js"]
+    }
+  }
+}
+```
+
+Restart the MCP server and check that `list_cherry_images` appears in its tool list. No new dependencies are needed. Ask the model to call `list_cherry_images`, identify your image from the previews, call `save_attached_image` with that image's ID, then annotate the returned path.
+
+Cherry Studio 2.1.8 does not automatically send current chat attachments to external MCP tools. This integration reads its local image cache, shared across chats. A vision-capable model must identify the matching preview; listing the newest file alone does not identify the current attachment. Previews are resized: annotation coordinates must use the original dimensions.
+
+The cache directory is resolved in order:
+
+1. `CHERRY_STUDIO_FILES_DIR`, if set, pointing directly to `Data/Files`.
+2. The single available directory from `~/.cherrystudio/boot-config.json`'s `app.user_data_path` mappings.
+3. The standard CherryStudio user-data directory's `Data/Files`, when no custom mapping is configured.
+
+If multiple configured caches exist, set an explicit override in the MCP configuration, for example `"env": { "CHERRY_STUDIO_FILES_DIR": "D:\\CherryData\\Data\\Files" }`. The integration copies selected originals into the project; it never infers a current conversation from cache order. Source investigation: [Cherry Studio 2.1.8 attachment handling](docs/research/cherry-studio-attachments.md).
+
 ---
 
 ## Coordinate model (read this first)
@@ -86,6 +128,39 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ---
 
 ## MCP Tools
+
+### `list_cherry_images`
+
+List Cherry Studio cached image candidates ordered by modification time, with original dimensions and labeled image previews. Use when the conversation contains an image but the model has neither a local path nor Base64.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `limit` | integer | `5` | Images per page, from 1 to 10 |
+| `offset` | integer | `0` | Use `next_offset` from the preceding result to page through older images |
+| `include_previews` | boolean | `true` | Return previews for matching the user's image |
+
+The text result contains `cache_directory`, `images` with `id`, dimensions, format, size, and timestamp, and `next_offset` (`null` at the end). Follow the text labels to associate previews with IDs. Corrupt or unsupported images are skipped. Select the matching candidate and pass its ID to `save_attached_image`.
+
+### `save_attached_image`
+
+Save a conversation image attachment to `.image-annotator-tmp/` and receive an absolute path for the existing image tools. Supply exactly one of `cherry_image_id` or `image_data`; saved files are limited to 20 MB and are eligible for cleanup after 24 hours. Expired files are removed when the server starts.
+
+| Param | Type | Description |
+|---|---|---|
+| `cherry_image_id` | string | Image ID including extension from `list_cherry_images`; supply this or `image_data` |
+| `image_data` | string | Base64 image data or a data URL such as `data:image/png;base64,...`; supply this or `cherry_image_id` |
+| `filename` | string | Optional filename hint; path segments are removed and the actual image format determines the extension |
+
+Example input:
+
+```json
+{
+  "image_data": "data:image/png;base64,iVBORw0KGgo...",
+  "filename": "image.png"
+}
+```
+
+The result is JSON with `path`, `filename`, `width`, `height`, `format`, `bytes`, and `expires_at`. Pass `path` to `get_image_dimensions` or any annotation tool.
 
 ### `annotate_screenshot`
 
@@ -297,6 +372,15 @@ node annotate.js --help
 ---
 
 ## Changelog
+
+### 1.4.0
+- Discover Cherry Studio image attachments from its configured cache and return labeled previews
+- Import a selected cached image by ID without supplying a local path or Base64
+- Add MCP integration tests for discovery, import, and annotation
+
+### 1.3.0
+- Add `save_attached_image` for Base64 images attached in a conversation
+- Validate and limit temporary images to 20 MB; clean up files older than 24 hours at startup
 
 ### 1.2.0
 - Add `spotlight` annotation type (dim + soft focus hole)

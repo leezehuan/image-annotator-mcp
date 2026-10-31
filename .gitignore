@@ -24,6 +24,9 @@ Thumbs.db
 *-callout.png
 *-blurred.png
 
+# Temporary images saved from conversation attachments
+.image-annotator-tmp/
+
 # Build artifacts
 dist/
 build/

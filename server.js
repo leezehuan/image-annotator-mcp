@@ -19,13 +19,66 @@ const {
 
 const path = require('path');
 const fs = require('fs');
+const { version } = require('./package.json');
 
 // Import annotation functions
 const sharp = require('sharp');
 const { annotateImage, frameImage, getImageDimensions, computeScale, COLORS, THEMES } = require('./annotate.js');
+const {
+  cleanupExpiredAttachments,
+  saveAttachedImage,
+  saveImageBuffer
+} = require('./attachment.js');
+const { listCherryImages, readCherryImage } = require('./cherry-cache.js');
 
 // Tool definitions
 const tools = [
+  {
+    name: 'list_cherry_images',
+    description: `Find images attached in Cherry Studio chats when the user has supplied an image but no local path or Base64.
+Call this tool first instead of asking the user to upload again. It reads Cherry's configured image cache
+and returns image IDs, dimensions, timestamps, and labeled previews. Match the preview to the user's image,
+then call save_attached_image with cherry_image_id. Cache images span all chats; never assume the newest
+is the current attachment. Use next_offset for older images. Preview coordinates are not original pixels.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 10, default: 5, description: 'Maximum images per page' },
+        offset: { type: 'integer', minimum: 0, default: 0, description: 'Use next_offset from a previous page' },
+        include_previews: { type: 'boolean', default: true, description: 'Return image previews so you can match the attachment' }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'save_attached_image',
+    description: `Save an image attached in the conversation to the project's temporary directory.
+
+If no local path or Base64 is available in Cherry Studio, call list_cherry_images first,
+match its preview to the user's attachment, then pass cherry_image_id here. Alternatively supply
+image_data as Base64 or a data URL. Supply exactly one source. The returned absolute path can be passed to
+get_image_dimensions, annotate_screenshot, create_step_guide, highlight_area,
+add_callout, blur_area, or frame_screenshot. Temporary files are eligible for cleanup after 24 hours.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        image_data: {
+          type: 'string',
+          description: 'Image bytes encoded as Base64 or a data URL such as data:image/png;base64,...'
+        },
+        cherry_image_id: {
+          type: 'string',
+          description: 'Image ID including extension returned by list_cherry_images; does not require Base64 or a local path'
+        },
+        filename: {
+          type: 'string',
+          description: 'Optional display filename. Path segments are removed and the actual image format is used.'
+        }
+      },
+      oneOf: [{ required: ['image_data'] }, { required: ['cherry_image_id'] }],
+      additionalProperties: false
+    }
+  },
   {
     name: 'annotate_screenshot',
     description: `Add professional annotations to a screenshot image.
@@ -305,52 +358,60 @@ Use on a raw or already-annotated screenshot. Supports webp/jpeg output and down
   }
 ];
 
-// Create server
-const server = new Server(
-  {
-    name: 'image-annotator',
-    version: '1.2.0',
-  },
-  {
-    capabilities: {
-      tools: {},
+// Create a server without starting stdio, so the same MCP interface can be tested in-process.
+function createServer() {
+  const server = new Server(
+    {
+      name: 'image-annotator',
+      version,
     },
-  }
-);
-
-// List tools handler
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
-
-// Tool call handler
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  try {
-    switch (name) {
-      case 'annotate_screenshot':
-        return await handleAnnotate(args);
-      case 'get_image_dimensions':
-        return await handleDimensions(args);
-      case 'create_step_guide':
-        return await handleStepGuide(args);
-      case 'highlight_area':
-        return await handleHighlight(args);
-      case 'add_callout':
-        return await handleCallout(args);
-      case 'blur_area':
-        return await handleBlur(args);
-      case 'frame_screenshot':
-        return await handleFrame(args);
-      default:
-        throw new Error(`Unknown tool: ${name}`);
+    {
+      capabilities: {
+        tools: {},
+      },
     }
-  } catch (error) {
-    return {
-      content: [{ type: 'text', text: `Error: ${error.message}` }],
-      isError: true,
-    };
-  }
-});
+  );
+
+  // List tools handler
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
+
+  // Tool call handler
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+
+    try {
+      switch (name) {
+        case 'list_cherry_images':
+          return await handleListCherryImages(args);
+        case 'save_attached_image':
+          return await handleSaveAttachedImage(args);
+        case 'annotate_screenshot':
+          return await handleAnnotate(args);
+        case 'get_image_dimensions':
+          return await handleDimensions(args);
+        case 'create_step_guide':
+          return await handleStepGuide(args);
+        case 'highlight_area':
+          return await handleHighlight(args);
+        case 'add_callout':
+          return await handleCallout(args);
+        case 'blur_area':
+          return await handleBlur(args);
+        case 'frame_screenshot':
+          return await handleFrame(args);
+        default:
+          throw new Error(`Unknown tool: ${name}`);
+      }
+    } catch (error) {
+      return {
+        content: [{ type: 'text', text: `Error: ${error.message}` }],
+        isError: true,
+      };
+    }
+  });
+
+  return server;
+}
 
 // Generate output path
 function getOutputPath(inputPath, suffix = '-annotated') {
@@ -361,6 +422,36 @@ function getOutputPath(inputPath, suffix = '-annotated') {
 }
 
 // Handlers
+async function handleListCherryImages(args) {
+  const { previews, ...listing } = await listCherryImages(args);
+  const content = [{ type: 'text', text: JSON.stringify(listing, null, 2) }];
+  for (const preview of previews) {
+    content.push({ type: 'text', text: `Preview for cherry_image_id: ${preview.id}` });
+    content.push({ type: 'image', data: preview.data, mimeType: preview.mimeType });
+  }
+  return { content };
+}
+
+async function handleSaveAttachedImage(args) {
+  const { image_data, cherry_image_id, filename } = args || {};
+  if ((image_data !== undefined) === (cherry_image_id !== undefined)) {
+    throw new Error('Supply exactly one of image_data or cherry_image_id. For a Cherry chat attachment without a path, call list_cherry_images first.');
+  }
+  let image;
+  if (cherry_image_id !== undefined) {
+    const { buffer } = await readCherryImage(cherry_image_id);
+    image = await saveImageBuffer(buffer, { filename: filename || cherry_image_id });
+  } else {
+    image = await saveAttachedImage({ image_data, filename });
+  }
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify(image, null, 2)
+    }]
+  };
+}
+
 async function handleAnnotate(args) {
   const { input_path, output_path, annotations, theme, scale, margin, matte, frame, format, quality, downscale } = args;
 
@@ -640,12 +731,18 @@ async function handleFrame(args) {
 
 // Start server
 async function main() {
+  await cleanupExpiredAttachments();
+  const server = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('Image Annotator MCP Server v1.2.0 running...');
+  console.error(`Image Annotator MCP Server v${version} running...`);
 }
 
-main().catch((error) => {
-  console.error('Server error:', error);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('Server error:', error);
+    process.exit(1);
+  });
+}
+
+module.exports = { createServer };

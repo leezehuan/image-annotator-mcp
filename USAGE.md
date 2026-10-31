@@ -4,20 +4,61 @@ A task-oriented cookbook. For the full parameter reference, see [README.md](READ
 
 Every recipe is a JSON payload you pass to a tool (`annotate_screenshot` unless noted). All coordinates are in **image pixels** — read [the coordinate model](README.md#coordinate-model-read-this-first) first.
 
+## Save an image attached in the conversation
+
+For Cherry Studio, first call `list_cherry_images` with `{}`. Match the image previews to the user's attachment, then import the selected candidate with `save_attached_image`:
+
+```json
+{
+  "cherry_image_id": "<id including extension returned by list_cherry_images>"
+}
+```
+
+The cache spans multiple chats, so identify the image visually instead of assuming the newest file is the current attachment. Use the returned `next_offset` to find older images. Annotation coordinates use the original dimensions, not the resized preview dimensions. See [Cherry Studio configuration](README.md#cherry-studio-stdio) if the cache is missing or stored on another drive.
+
+When the client already supplies image data, pass Base64 or a data URL instead:
+
+```json
+{
+  "image_data": "data:image/png;base64,iVBORw0KGgo...",
+  "filename": "image.png"
+}
+```
+
+The response includes an absolute `path`. Use it in the existing image tools, for example:
+
+```json
+{ "image_path": "<path returned by save_attached_image>" }
+```
+
+for `get_image_dimensions`, or:
+
+```json
+{
+  "input_path": "<path returned by save_attached_image>",
+  "annotations": [
+    { "type": "rect", "x": 100, "y": 80, "width": 160, "height": 90, "color": "pink" }
+  ]
+}
+```
+
+for `annotate_screenshot`. Attachments larger than 20 MB are rejected. Temporary files are stored in `.image-annotator-tmp/`; files older than 24 hours are removed at server startup.
+
 ---
 
 ## Contents
 
-1. [Find the right coordinates](#1-find-the-right-coordinates)
-2. [Numbered steps that don't cover the UI](#2-numbered-steps-that-dont-cover-the-ui)
-3. [Spotlight a single feature](#3-spotlight-a-single-feature)
-4. [A framed hero screenshot](#4-a-framed-hero-screenshot)
-5. [Call out a detail](#5-call-out-a-detail)
-6. [Outline / highlight a region](#6-outline--highlight-a-region)
-7. [Blur sensitive data](#7-blur-sensitive-data)
-8. [Optimized output for docs sites](#8-optimized-output-for-docs-sites)
-9. [Quick one-liners](#9-quick-one-liners)
-10. [Troubleshooting](#10-troubleshooting)
+- [Save an image attached in the conversation](#save-an-image-attached-in-the-conversation)
+- [Find the right coordinates](#1-find-the-right-coordinates)
+- [Numbered steps that don't cover the UI](#2-numbered-steps-that-dont-cover-the-ui)
+- [Spotlight a single feature](#3-spotlight-a-single-feature)
+- [A framed hero screenshot](#4-a-framed-hero-screenshot)
+- [Call out a detail](#5-call-out-a-detail)
+- [Outline / highlight a region](#6-outline--highlight-a-region)
+- [Blur sensitive data](#7-blur-sensitive-data)
+- [Optimized output for docs sites](#8-optimized-output-for-docs-sites)
+- [Quick one-liners](#9-quick-one-liners)
+- [Troubleshooting](#10-troubleshooting)
 
 ---
 
@@ -217,6 +258,10 @@ When you don't need a full composition:
 ---
 
 ## 10. Troubleshooting
+
+**Cherry still asks for a path or re-upload.** Restart the MCP server so `list_cherry_images` is loaded, then ask the model to use that tool before `save_attached_image`. Version 1.3.0 only accepted Base64; the cache integration requires 1.4.0. The MCP command must run this local `server.js`, rather than an older published package. A model that can process image previews is needed to match a candidate to the attachment.
+
+**Cherry cache is missing or ambiguous.** Set `CHERRY_STUDIO_FILES_DIR` in the MCP environment to the active `Data/Files` directory and restart the server. Automatic discovery reads Cherry's custom-directory boot configuration before the default location.
 
 **Annotations look tiny.** The image is probably retina (2x). Sizing auto-scales by width, but if you passed explicit `size`/`fontSize`/`strokeWidth` they're used as-is — raise them, or pass a higher `scale`.
 
