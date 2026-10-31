@@ -1,0 +1,35 @@
+{
+  "retrieved": "2026-10-31",
+  "assets": [
+    {
+      "file": "voltage-divider.svg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Voltage_divider.svg",
+      "source": "https://commons.wikimedia.org/wiki/File:Voltage_divider.svg",
+      "license": "Public domain",
+      "author": "See original file page",
+      "bytes": 1866,
+      "sha256": "6e67416dbc2ce0f49510d6d05e294a3114c289e2132a874841da841862cf9a2d",
+      "downloaded_sha256": "4bb8699ce8355924b848d9c6485f2e40d998238e7cf87c10672940b444009a43",
+      "changes": "Trailing whitespace removed; SVG geometry unchanged."
+    },
+    {
+      "file": "arduino-uno.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/3/38/Arduino_Uno_-_R3.jpg",
+      "source": "https://commons.wikimedia.org/wiki/File:Arduino_Uno_-_R3.jpg",
+      "license": "CC BY 2.0",
+      "license_url": "https://creativecommons.org/licenses/by/2.0/",
+      "author": "SparkFun Electronics",
+      "bytes": 243990,
+      "sha256": "8a799b15d7816961912f4ef37fe5606bc19cb2e0cbadaf220ebe4289a5846fb6"
+    },
+    {
+      "file": "earthrise.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/a8/NASA-Apollo8-Dec24-Earthrise.jpg",
+      "source": "https://commons.wikimedia.org/wiki/File:NASA-Apollo8-Dec24-Earthrise.jpg",
+      "license": "Public domain",
+      "author": "NASA / Bill Anders",
+      "bytes": 311263,
+      "sha256": "24fd2a4f833534ca6741ed96d03b028ac1d8fda2cd129ded4d208535f541d4da"
+    }
+  ]
+}

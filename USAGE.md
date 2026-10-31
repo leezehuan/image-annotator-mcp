@@ -1,8 +1,8 @@
 # Usage Guide — Image Annotator MCP
 
-A task-oriented cookbook. For the full parameter reference, see [README.en.md](README.en.md).
+A task-oriented cookbook. For the full parameter reference, see [docs/REFERENCE.en.md](docs/REFERENCE.en.md).
 
-Every recipe is a JSON payload you pass to a tool (`annotate_screenshot` unless noted). All coordinates are in **image pixels** — read [the coordinate model](README.en.md#coordinate-model-read-this-first) first.
+Every recipe is a JSON payload you pass to a tool (`annotate_screenshot` unless noted). All coordinates are in **image pixels** — read [the coordinate model](docs/REFERENCE.en.md#coordinate-model-read-this-first) first.
 
 ## Save an image attached in the conversation
 
@@ -14,7 +14,7 @@ For Cherry Studio, first call `list_cherry_images` with `{}`. Match the image pr
 }
 ```
 
-The cache spans multiple chats, so identify the image visually instead of assuming the newest file is the current attachment. Use the returned `next_offset` to find older images. Annotation coordinates use the original dimensions, not the resized preview dimensions. See [Cherry Studio configuration](README.en.md#cherry-studio-stdio) if the cache is missing or stored on another drive.
+The cache spans multiple chats, so identify the image visually instead of assuming the newest file is the current attachment. Use the returned `next_offset` to find older images. Annotation coordinates use the original dimensions, not the resized preview dimensions. See [Cherry Studio configuration](docs/REFERENCE.en.md#cherry-studio-stdio) if the cache is missing or stored on another drive.
 
 When the client already supplies image data, pass Base64 or a data URL instead:
 
@@ -72,7 +72,7 @@ Before annotating, get the real pixel size:
 // → { "width": 3450, "height": 1760, "format": "png" }
 ```
 
-If you captured with Playwright, measure the element's center and multiply by the device pixel ratio (usually 2 on retina). See the [Playwright workflow](README.en.md#workflow-with-playwright-mcp).
+If you captured with Playwright, measure the element's center and multiply by the device pixel ratio (usually 2 on retina). See the [Playwright workflow](docs/REFERENCE.en.md#workflow-with-playwright-mcp).
 
 Rule of thumb: **point `target` at the element's center**, and let markers/spotlights offset themselves.
 
