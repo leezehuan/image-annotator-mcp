@@ -1,6 +1,6 @@
 {
   "name": "image-annotator-mcp",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Professional MCP server for annotating screenshots with markers, arrows, callouts, and more. Works seamlessly with Playwright MCP for documentation workflows.",
   "main": "server.js",
   "bin": {
@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server.js",
     "cli": "node annotate.js",
-    "test": "node test/save-attached-image.test.js && node test/cherry-cache.test.js && node test/cherry-attachments.test.js && node test/image-results.test.js"
+    "test": "node test/save-attached-image.test.js && node test/cherry-cache.test.js && node test/cherry-attachments.test.js && node test/image-results.test.js && node test/text-layout.test.js"
   },
   "keywords": [
     "mcp",

@@ -11,6 +11,8 @@
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
+const { estimateTextBounds, measureTextBounds } = require('./text-layout.js');
+const TEXT_BOUNDS = Symbol('textBounds');
 
 // Clean, professional font stack — the default for all product documentation.
 // Resolves to SF Pro (macOS) / Segoe UI (Windows) / Roboto (Linux) / Helvetica.
@@ -313,20 +315,19 @@ function createCurvedArrow({ from, to, curve = 50, color = 'red', strokeWidth = 
 /**
  * Create professional callout box with pointer (rounded corners, handwriting font)
  */
-function createCallout({ x, y, text, color = 'primary', background = 'white', width = null, pointer = 'bottom', fontSize = 18, shadow = true, handwriting = false, scale = 1 }) {
+function createCallout(options) {
+  const { x, y, color = 'primary', background = 'white', width = null, pointer = 'bottom', shadow = true, scale = 1 } = options;
   const borderColor = getColor(color);
   const bgColor = getColor(background);
   const id = generateId('callout');
   const defs = [];
-  const fontFamily = handwriting ? HANDWRITING_FONT : CLEAN_FONT;
-  const fs = fontSize * scale;
+  const { fontFamily, fontSize: fs, fontWeight, lineHeight, lines } = textSettings(options);
 
   // Calculate dimensions
   const padding = 14 * scale;
-  const lineHeight = fs * 1.5;
-  const lines = text.split('\n');
-  const textWidth = width || Math.max(...lines.map(l => l.length * fs * 0.6)) + padding * 2;
-  const textHeight = lines.length * lineHeight + padding * 2;
+  const bounds = options[TEXT_BOUNDS] || estimateTextBounds(lines, fs, lineHeight);
+  const textWidth = width || bounds.width + padding * 2;
+  const textHeight = bounds.height + padding * 2;
   const strokeW = 3 * scale;
 
   // Add drop shadow
@@ -368,8 +369,9 @@ function createCallout({ x, y, text, color = 'primary', background = 'white', wi
   }
 
   // Build text elements
+  const textX = boxX + padding - bounds.left;
   const textElements = lines.map((line, i) =>
-    `<tspan x="${boxX + padding}" dy="${i === 0 ? 0 : lineHeight}">${escapeXml(line)}</tspan>`
+    `<tspan x="${textX}" dy="${i === 0 ? 0 : lineHeight}">${escapeXml(line)}</tspan>`
   ).join('');
 
   const element = `
@@ -377,8 +379,8 @@ function createCallout({ x, y, text, color = 'primary', background = 'white', wi
       <rect x="${boxX}" y="${boxY}" width="${textWidth}" height="${textHeight}"
             rx="${10 * scale}" fill="${bgColor}" stroke="${borderColor}" stroke-width="${strokeW}" stroke-linejoin="round"/>
       ${pointerPath ? `<path d="${pointerPath}" fill="${bgColor}" stroke="${borderColor}" stroke-width="${strokeW}" stroke-linejoin="round"/>` : ''}
-      <text x="${boxX + padding}" y="${boxY + padding + fs}"
-            fill="${getColor('darkGray')}" font-size="${fs}" font-family="${fontFamily}" font-weight="600">
+      <text x="${textX}" y="${boxY + padding - bounds.top}"
+            fill="${getColor('darkGray')}" font-size="${fs}" font-family="${fontFamily}" font-weight="${fontWeight}">
         ${textElements}
       </text>
     </g>
@@ -440,18 +442,17 @@ function createCircle({ x, y, radius = 30, color = 'red', strokeWidth = 4, fill 
 /**
  * Create text label with optional background (handwriting font support)
  */
-function createLabel({ x, y, text, color = 'darkGray', fontSize = 18, fontWeight = '600', background = null, padding = 10, cornerRadius = 8, shadow = true, handwriting = false, scale = 1 }) {
+function createLabel(options) {
+  const { x, y, text, color = 'darkGray', background = null, padding = 10, cornerRadius = 8, shadow = true, scale = 1 } = options;
   const textColor = getColor(color);
   const id = generateId('label');
   const defs = [];
   const elements = [];
-  const fontFamily = handwriting ? HANDWRITING_FONT : CLEAN_FONT;
-  const fs = fontSize * scale;
+  const { fontFamily, fontSize: fs, fontWeight, lineHeight, lines } = textSettings(options);
   const pad = padding * scale;
 
   // Calculate text dimensions
-  const textWidth = text.length * fs * 0.6;
-  const textHeight = fs * 1.3;
+  const bounds = options[TEXT_BOUNDS] || estimateTextBounds(lines, fs, lineHeight);
 
   if (shadow && background) {
     defs.push(createDropShadow(`${id}-shadow`, 4, 0.2));
@@ -462,8 +463,8 @@ function createLabel({ x, y, text, color = 'darkGray', fontSize = 18, fontWeight
   if (background) {
     const bgColor = getColor(background);
     elements.push(`
-      <rect x="${x - pad}" y="${y - textHeight - pad + 4 * scale}"
-            width="${textWidth + pad * 2}" height="${textHeight + pad * 2}"
+      <rect x="${x + bounds.left - pad}" y="${y + bounds.top - pad}"
+            width="${bounds.width + pad * 2}" height="${bounds.height + pad * 2}"
             rx="${cornerRadius * scale}" fill="${bgColor}" stroke="${textColor}" stroke-width="${2 * scale}" stroke-linejoin="round" ${filterAttr}/>
     `);
   }
@@ -650,6 +651,47 @@ function adjustColor(hex, amount) {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
+function annotationOptions(annotation, themeDefaults, scale) {
+  return {
+    scale,
+    ...(themeDefaults && themeDefaults[annotation.type] ? themeDefaults[annotation.type] : {}),
+    ...annotation
+  };
+}
+
+function textSettings({ type, text, fontSize = 18, scale = 1, handwriting = false, fontWeight = '600' }) {
+  const scaledFontSize = fontSize * scale;
+  return {
+    lines: type === 'callout' ? text.split('\n') : [text],
+    fontSize: scaledFontSize,
+    fontFamily: handwriting ? HANDWRITING_FONT : CLEAN_FONT,
+    fontWeight: type === 'callout' ? '600' : fontWeight,
+    lineHeight: scaledFontSize * 1.5
+  };
+}
+
+async function layoutTextAnnotations(annotations, theme, scale) {
+  const themeDefaults = theme ? THEMES[theme] : null;
+  const cache = new Map();
+  const result = [];
+  for (const annotation of annotations) {
+    if (!['label', 'text', 'callout'].includes(annotation.type)) {
+      result.push(annotation);
+      continue;
+    }
+    const options = annotationOptions(annotation, themeDefaults, scale);
+    if (annotation.type !== 'callout' && !options.background) {
+      result.push(annotation);
+      continue;
+    }
+    const settings = textSettings(options);
+    const key = JSON.stringify(settings);
+    if (!cache.has(key)) cache.set(key, await measureTextBounds(settings));
+    result.push({ ...annotation, [TEXT_BOUNDS]: cache.get(key) });
+  }
+  return result;
+}
+
 /**
  * Build complete SVG from annotations
  */
@@ -668,11 +710,7 @@ function buildSvg(width, height, annotations, theme = null, opts = {}) {
   for (const ann of annotations) {
     // Merge with theme defaults, then inject the global scale (a per-annotation
     // `scale` still wins so callers can fine-tune an individual element).
-    const mergedAnn = {
-      scale,
-      ...(themeDefaults && themeDefaults[ann.type] ? themeDefaults[ann.type] : {}),
-      ...ann
-    };
+    const mergedAnn = annotationOptions(ann, themeDefaults, scale);
 
     let result;
 
@@ -767,7 +805,8 @@ async function annotateImage(inputPath, outputPath, annotations, options = {}) {
   const matte = options.matte || '#FFFFFF';
 
   // Build SVG overlay (sized to include any margin padding)
-  const svg = buildSvg(width, height, annotations, options.theme, { scale, margin });
+  const laidOutAnnotations = await layoutTextAnnotations(annotations, options.theme, scale);
+  const svg = buildSvg(width, height, laidOutAnnotations, options.theme, { scale, margin });
 
   // Optionally pad the canvas so gutter callouts/markers are never clipped
   let pipeline = sharp(inputPath);

@@ -168,6 +168,8 @@ The result is JSON with `path`, `filename`, `width`, `height`, `format`, `bytes`
 
 The main composition tool. Apply any number of annotations, optional theme, framing, and output settings.
 
+Backgrounds for `label` and automatically sized `callout` annotations are measured using the actual rendered font, including Chinese and mixed text. A label's `x`/`y` still marks the text baseline; its background is sized around the glyphs.
+
 | Param | Type | Default | Description |
 |---|---|---|---|
 | `input_path` | string | — | Absolute path to the input screenshot (**required**) |
@@ -374,6 +376,10 @@ node annotate.js --help
 ---
 
 ## Changelog
+
+### 1.4.2
+- Measure rendered text to size label backgrounds and callout boxes for Chinese and mixed text
+- Preserve label baseline coordinates and use actual glyph bounds for balanced padding
 
 ### 1.4.1
 - Return generated images as MCP image content, alongside saved paths, so clients can display them

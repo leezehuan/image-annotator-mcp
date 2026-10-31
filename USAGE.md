@@ -276,3 +276,5 @@ When you don't need a full composition:
 **Colors look off in JPEG.** JPEG has no transparency; the matte is flattened to white. Use `png` or `webp` if you need transparency.
 
 **Coordinates are wrong.** Re-check with `get_image_dimensions` and remember the 2x retina factor — DOM coordinates are half the image pixels.
+
+**Chinese text extends beyond its label box.** Versions before 1.4.2 estimated every character as 0.6 times the font size, which underestimates Chinese and wide letters. Update and restart the MCP server, then regenerate the image. Label backgrounds and automatically sized callouts now use actual rendered text bounds; label `x`/`y` remain text baseline coordinates.
