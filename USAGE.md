@@ -259,6 +259,8 @@ When you don't need a full composition:
 
 ## 10. Troubleshooting
 
+**The annotated image is saved but not visible in Cherry's final reply.** A Markdown image such as `![](D:/.../result.png)` cannot load a local disk path in Cherry's final reply. Starting with 1.4.1, image-generating tools return actual MCP image content as well as the path. Restart the MCP server, run the annotation again, and expand the tool card to see its response image. Old text-only tool results are not updated automatically. Tool-result previews do not automatically insert an image into the assistant's final message.
+
 **Cherry still asks for a path or re-upload.** Restart the MCP server so `list_cherry_images` is loaded, then ask the model to use that tool before `save_attached_image`. Version 1.3.0 only accepted Base64; the cache integration requires 1.4.0. The MCP command must run this local `server.js`, rather than an older published package. A model that can process image previews is needed to match a candidate to the attachment.
 
 **Cherry cache is missing or ambiguous.** Set `CHERRY_STUDIO_FILES_DIR` in the MCP environment to the active `Data/Files` directory and restart the server. Automatic discovery reads Cherry's custom-directory boot configuration before the default location.

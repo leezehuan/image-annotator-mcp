@@ -129,6 +129,8 @@ If multiple configured caches exist, set an explicit override in the MCP configu
 
 ## MCP Tools
 
+Image-generating tools (`annotate_screenshot`, `create_step_guide`, `highlight_area`, `add_callout`, `blur_area`, and `frame_screenshot`) return both a text block with the saved path and an MCP `image` block containing the generated image. In Cherry Studio 2.1.8, expand the completed tool card to see the image in its response. The final assistant text does not automatically embed tool images, and a Markdown image pointing to `D:/...` is not a supported way to display a local file there.
+
 ### `list_cherry_images`
 
 List Cherry Studio cached image candidates ordered by modification time, with original dimensions and labeled image previews. Use when the conversation contains an image but the model has neither a local path nor Base64.
@@ -372,6 +374,10 @@ node annotate.js --help
 ---
 
 ## Changelog
+
+### 1.4.1
+- Return generated images as MCP image content, alongside saved paths, so clients can display them
+- Document Cherry Studio's tool-result image preview and final-message local-path limitation
 
 ### 1.4.0
 - Discover Cherry Studio image attachments from its configured cache and return labeled previews

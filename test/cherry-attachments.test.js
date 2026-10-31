@@ -60,6 +60,10 @@ async function main() {
       }
     });
     assert.ok(!annotated.isError, JSON.stringify(annotated));
+    const displayedImage = annotated.content.find((part) => part.type === 'image');
+    assert.ok(displayedImage, 'annotation result must contain image data, not just a local path');
+    assert.equal(displayedImage.mimeType, 'image/png');
+    assert.deepEqual(Buffer.from(displayedImage.data, 'base64'), await fs.readFile(outputPath));
     const { data, info } = await sharp(outputPath).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     assert.equal(info.width, 100);
     assert.equal(info.height, 60);

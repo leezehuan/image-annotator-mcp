@@ -82,6 +82,8 @@ add_callout, blur_area, or frame_screenshot. Temporary files are eligible for cl
   {
     name: 'annotate_screenshot',
     description: `Add professional annotations to a screenshot image.
+Returns the saved image as MCP image content plus its file path. In Cherry Studio, the user can
+expand this tool's response to view the image; a local-path Markdown image is not a display URL.
 
 Annotation types available:
 • marker - Numbered circles (1, 2, 3...) with gradient and shadow
@@ -421,6 +423,18 @@ function getOutputPath(inputPath, suffix = '-annotated') {
   return path.join(dir, `${base}${suffix}${ext}`);
 }
 
+async function imageResult(outputPath, message) {
+  const buffer = await fs.promises.readFile(outputPath);
+  const metadata = await sharp(buffer).metadata();
+  const mimeType = metadata.format === 'jpeg' ? 'image/jpeg' : `image/${metadata.format}`;
+  return {
+    content: [
+      { type: 'text', text: `${message}\n  Image included in this tool response. In Cherry Studio, expand the tool result to view it.` },
+      { type: 'image', data: buffer.toString('base64'), mimeType }
+    ]
+  };
+}
+
 // Handlers
 async function handleListCherryImages(args) {
   const { previews, ...listing } = await listCherryImages(args);
@@ -469,12 +483,8 @@ async function handleAnnotate(args) {
     theme, scale, margin, matte, frame, format, quality, downscale
   });
 
-  return {
-    content: [{
-      type: 'text',
-      text: `✓ Annotated screenshot saved: ${result.outputPath}\n  Size: ${result.width}x${result.height}\n  Annotations: ${result.annotationCount}\n  Scale: ${result.scale}x${theme ? `\n  Theme: ${theme}` : ''}${frame ? '\n  Frame: on' : ''}`
-    }]
-  };
+  return imageResult(result.outputPath,
+    `✓ Annotated screenshot saved: ${result.outputPath}\n  Size: ${result.width}x${result.height}\n  Annotations: ${result.annotationCount}\n  Scale: ${result.scale}x${theme ? `\n  Theme: ${theme}` : ''}${frame ? '\n  Frame: on' : ''}`);
 }
 
 async function handleDimensions(args) {
@@ -556,12 +566,7 @@ async function handleStepGuide(args) {
   const finalPath = output_path || getOutputPath(input_path, '-guide');
   const result = await annotateImage(input_path, finalPath, annotations, { theme });
 
-  return {
-    content: [{
-      type: 'text',
-      text: `✓ Step guide created: ${result.outputPath}\n  Steps: ${steps.length}`
-    }]
-  };
+  return imageResult(result.outputPath, `✓ Step guide created: ${result.outputPath}\n  Steps: ${steps.length}`);
 }
 
 async function handleHighlight(args) {
@@ -627,12 +632,7 @@ async function handleHighlight(args) {
   const finalPath = output_path || getOutputPath(input_path, '-highlighted');
   await annotateImage(input_path, finalPath, annotations);
 
-  return {
-    content: [{
-      type: 'text',
-      text: `✓ Highlighted: ${finalPath}`
-    }]
-  };
+  return imageResult(finalPath, `✓ Highlighted: ${finalPath}`);
 }
 
 async function handleCallout(args) {
@@ -655,12 +655,7 @@ async function handleCallout(args) {
   const finalPath = output_path || getOutputPath(input_path, '-callout');
   await annotateImage(input_path, finalPath, annotations);
 
-  return {
-    content: [{
-      type: 'text',
-      text: `✓ Callout added: ${finalPath}`
-    }]
-  };
+  return imageResult(finalPath, `✓ Callout added: ${finalPath}`);
 }
 
 async function handleBlur(args) {
@@ -678,12 +673,7 @@ async function handleBlur(args) {
   const finalPath = output_path || getOutputPath(input_path, '-blurred');
   await annotateImage(input_path, finalPath, annotations);
 
-  return {
-    content: [{
-      type: 'text',
-      text: `✓ Area blurred: ${finalPath}`
-    }]
-  };
+  return imageResult(finalPath, `✓ Area blurred: ${finalPath}`);
 }
 
 async function handleFrame(args) {
@@ -721,12 +711,8 @@ async function handleFrame(args) {
   await out.toFile(finalPath);
 
   const fm = await sharp(buf).metadata();
-  return {
-    content: [{
-      type: 'text',
-      text: `✓ Framed screenshot saved: ${finalPath}\n  Size: ${fm.width}x${fm.height}${browser_bar ? '\n  Browser bar: on' : ''}`
-    }]
-  };
+  return imageResult(finalPath,
+    `✓ Framed screenshot saved: ${finalPath}\n  Size: ${fm.width}x${fm.height}${browser_bar ? '\n  Browser bar: on' : ''}`);
 }
 
 // Start server

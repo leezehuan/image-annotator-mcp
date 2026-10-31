@@ -80,3 +80,26 @@
 3. 缓存目录的最近文件不能证明是当前聊天附件；不同安装、绘图、其他聊天和历史文件可能共享候选集合。
 4. 从磁盘直接读取图片并在 MCP result 返回图片内容，是源码支持的方向；要求模型自己复述原图 Base64 并不构成可靠的客户端附件桥接。
 5. 若需要精确的“当前会话附件”边界，已知结构是客户端请求内的附件允许列表；普通外部 MCP 调用没有自动收到该列表。
+
+## 7. 标注结果显示：最终 Markdown 与工具卡是两条路径
+
+补充核查日期：2026-10-31。以下证据仍全部对应 commit `9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1`；这里只读程序与测试源码，没有读取用户聊天。
+
+### 最终回复的本地图片路径
+
+- **`![](D:/Project/xxx-annotated.png)` 不能作为 Cherry 2.1.8 普通聊天的可靠图片显示方式，改成 `file:///D:/...` 也不能解决。** 官方测试明确输入 `![f](file:///x/a.png)`，断言没有 `img`、没有 `file://`；另一个测试在开启相对图片保留功能时输入 `C:/docs/x.png`，仍断言没有 `img`。无 alt 的无效图片还会被直接丢弃，这能解释 `![](...)` 看起来完全没有输出的情况。[markdown.test.tsx L175-L192](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/packages/ui/src/components/composites/markdown/__tests__/markdown.test.tsx#L175)、[L281-L293](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/packages/ui/src/components/composites/markdown/__tests__/markdown.test.tsx#L281)
+- 静态和流式 Markdown 共用 MarkdownCore：先执行 URL sanitize，再 harden。Cherry 的扩展 sanitize schema 只给 `src` 增加 `data`；urlTransform 只显式放行 `data:image/png;` 和 `data:image/jpeg;`，其他交给默认 transform。图片 renderer 不会把 `D:/...` 自动转成 file URL，只把有效 src 交给 ImageViewer。[internal.tsx L173-L211](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/packages/ui/src/components/composites/markdown/internal.tsx#L173)、[sanitize.ts L245-L251](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/packages/ui/src/components/composites/markdown/utils/sanitize.ts#L245)、[MarkdownRenderers.tsx L188-L225](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/src/renderer/components/markdown/MarkdownRenderers.tsx#L188)
+- 本地文件**链接**和本地图片不同。文件 href 的保留插件只对 `a` 元素保留 Windows 盘符/无 scheme 路径，不给 `img src` 开同样的例外。聊天宿主具备 openArtifactFile 时会提供 openFilePath；`[打开图片](D:/Project/xxx.png)` 可走这套文件打开路径，但它表示点击打开，不表示正文内嵌。[rehype-preserve-file-links.ts L19-L48](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/packages/ui/src/components/composites/markdown/plugins/rehype-preserve-file-links.ts#L19)、[ChatMarkdownRuntime.tsx L60-L89](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/src/renderer/components/chat/messages/markdown/ChatMarkdownRuntime.tsx#L60)、[MarkdownRenderers.tsx L102-L115](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/src/renderer/components/markdown/MarkdownRenderers.tsx#L102)
+- 未在已核查的该版本 Markdown/媒体协议实现找到可推荐的 `local-image://` 本地路径协议。现有 **`cherry-media://image/<id>`** 来自主进程 MediaProtocolService 的内存 buffer 注册表，id 是该服务 store 生成的随机 id；请求必须命中内存记录，否则 404。它不是将任意磁盘路径拼到 URL 后就能读取的文件服务，也不是 fileEntryId 的通用替代 URL。[MediaProtocolService.ts L64-L103](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/src/main/services/mediaProtocol/MediaProtocolService.ts#L64)
+- 附件区 ImageBlock 可以使用客户端解析后的 `file://`，但它没有经过最终 Markdown 的同一 URL 清洗流程。MessageImageBlock 有 fileEntry handle 时查询当前物理路径，无 handle 时仍使用 source.url；因此“最终 Markdown 不显示”不能归结为“必须先登记 fileEntryId”，也不能从附件区支持 file URL 推导正文支持 file URL。[MessageImageBlock.tsx L31-L60](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/src/renderer/components/chat/messages/blocks/MessageImageBlock.tsx#L31)、[ImageBlock.tsx L24-L40](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/src/renderer/components/chat/messages/blocks/ImageBlock.tsx#L24)
+
+### MCP `type: image` 对用户可见，但在折叠工具卡中
+
+- 工具卡会按 SDK CallToolResult schema 读取响应，收集 `content.type === 'image'` 的 data 和 mimeType，随后实际渲染 `<img src="data:<mime>;base64,<data>">`，最大宽度 300。**这不只是给 LLM 的图片输入，也是用户可见的工具 Response 预览。** `[text, image]` 的同一结果可以同时显示文本和图片。[MessageMcpTool.tsx L192-L238](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/src/renderer/components/chat/messages/tools/mcp/MessageMcpTool.tsx#L192)、[L442-L460](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/src/renderer/components/chat/messages/tools/mcp/MessageMcpTool.tsx#L442)
+- 工具状态变为 done/error 时会自动折叠；未展开时 ToolResponseContent 直接返回 null。用户需要展开对应工具卡，在 Response 里查看图片。它不会因为工具返回了 image 就自动在最终助理正文追加同一张图片。[MessageMcpTool.tsx L71-L79](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/src/renderer/components/chat/messages/tools/mcp/MessageMcpTool.tsx#L71)、[L287-L302](https://github.com/CherryHQ/cherry-studio/blob/9e7bb8a17d002c31bfb83ea4acd6c3b501bf40f1/src/renderer/components/chat/messages/tools/mcp/MessageMcpTool.tsx#L287)
+
+### 由上述实现支持的最小交互
+
+生成工具把服务端从原输出文件读取的图片作为 MCP `type: image` 返回，同时保留原有输出路径文本；用户展开该工具的 Response 查看标注结果。最终回复可以说明图片位于工具 Response，并提供本地文件路径/文件打开链接。**不能承诺仅返回 image block 就让最终回复正文内嵌，也不能推荐把路径统一改成 `file:///` 来绕过这项限制。**
+
+真正的正文图片仍要使用其 Markdown 管线允许的内容来源（例如已存在的可访问 HTTP(S) 图片或明确放行的 PNG/JPEG data URI），但本次任务不因此引入 HTTP 服务、不要求模型重写整张图片 Base64，也不修改/绕过 Cherry 的 sanitizer。这里只作源码级结论，没有在 Cherry 用户 UI 中重放这次显示场景。
